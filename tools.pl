@@ -1,47 +1,28 @@
-% Mukuvi Terminal in Prolog
+:- module(mukuvi_terminal, [start_terminal/0]).
 
-:- module(mukuvi_terminal, [
-    start_terminal/0,
-    process_command/1,
-    load_plugins/1
-]).
-
-:- use_module(library(http/http_open)).
-:- use_module(library(filesex)).
 :- use_module(library(readutil)).
+:- use_module(library(socket)).
 
-% Dynamic predicates for plugin management
 :- dynamic plugin/3.
+:- dynamic connection/1.
 
-% Color definitions
 color(red, '\033[31m').
 color(green, '\033[32m').
 color(yellow, '\033[33m').
 color(blue, '\033[34m').
 color(reset, '\033[0m').
 
-% Terminal configuration
-terminal_version('1.0.0').
+terminal_version('1.0.1').
 
-% Plugin structure predicate
-plugin_info(Name, Description, Handler) :-
-    plugin(Name, Description, Handler).
-
-% Initialize plugins
 initialize_plugins :-
-    assertz(plugin(help, 'Display available commands', help_handler)),
-    assertz(plugin(system_info, 'Show system information', system_info_handler)),
-    assertz(plugin(network_scan, 'Perform network scanning', network_scan_handler)),
-    assertz(plugin(process_list, 'List running processes', process_list_handler)),
-    assertz(plugin(file_explore, 'Explore file system', file_explore_handler)).
+    assertz(plugin(help, 'Display commands', help_handler)),
+    assertz(plugin(connect, 'Connect to C terminal', connect_handler)),
+    assertz(plugin(listen, 'Start server', listen_handler)).
 
-% Help handler
 help_handler(_) :-
     color(blue, Blue),
-    color(green, Green),
     color(reset, Reset),
-    format('~wMukuvi Terminal - Available Plugins~w~n', [Blue, Reset]),
-    format('-----------------------------~n'),
+    format('~wMukuvi Terminal~w~n', [Blue, Reset]),
     findall(Name, plugin(Name, Description, _), Plugins),
     print_plugins(Plugins).
 
@@ -53,116 +34,105 @@ print_plugins([Plugin|Rest]) :-
     format('~w~w~w: ~w~n', [Green, Plugin, Reset, Description]),
     print_plugins(Rest).
 
-% System information handler
-system_info_handler(_) :-
-    color(blue, Blue),
-    color(green, Green),
-    color(reset, Reset),
-    format('~wSystem Information~w~n', [Blue, Reset]),
-    format('------------------~n'),
-    
-    % CPU Information
-    (catch(shell('lscpu | grep "Model name"', _), _, fail) -> true ; 
-        format('Could not retrieve CPU info~n')),
-    
-    % Memory Information
-    (catch(shell('free -h'), _), _ -> true ; 
-        format('Could not retrieve memory info~n')).
-
-% Network scan handler
-network_scan_handler(_) :-
-    color(blue, Blue),
-    color(green, Green),
-    color(reset, Reset),
-    format('~wNetwork Scan~w~n', [Blue, Reset]),
-    format('------------~n'),
-    
-    % Perform network scan
-    (catch(shell('ip addr'), _, fail) -> true ; 
-        format('Network scan failed~n')).
-
-% Process list handler
-process_list_handler(_) :-
-    color(blue, Blue),
-    color(green, Green),
-    color(reset, Reset),
-    format('~wRunning Processes~w~n', [Blue, Reset]),
-    format('----------------~n'),
-    
-    % List top processes
-    (catch(shell('ps aux | head -n 10'), _, fail) -> true ; 
-        format('Process list retrieval failed~n')).
-
-% File exploration handler
-file_explore_handler(_) :-
-    color(blue, Blue),
-    color(green, Green),
-    color(reset, Reset),
-    format('~wFile System Explorer~w~n', [Blue, Reset]),
-    format('-------------------~n'),
-    
-    % Current directory listing
-    current_directory(Dir),
-    format('Current Directory: ~w~n', [Dir]),
-    (catch(shell('ls -la'), _, fail) -> true ; 
-        format('File listing failed~n')).
-
-% Command processing
-process_command(Command) :-
-    % Trim whitespace
-    string_trim(Command, TrimmedCommand),
-    
-    % Exit condition
-    (TrimmedCommand == 'exit' -> 
-        color(yellow, Yellow),
+connect_handler([Host, PortStr]) :-
+    catch(
+        (atom_number(PortStr, Port),
+        tcp_connect(Host:Port, Stream, [type(text)]),
+        assertz(connection(Stream)),
+        color(green, Green),
         color(reset, Reset),
-        format('~wExiting Mukuvi Terminal~w~n', [Yellow, Reset]),
-        halt
+        format('~wConnected to ~w:~w~w~n', [Green, Host, Port, Reset])),
+        _,
+        (color(red, Red),
+        color(reset, Reset),
+        format('~wConnection failed~w~n', [Red, Reset]))).
+
+listen_handler([PortStr]) :-
+    catch(
+        (atom_number(PortStr, Port),
+        tcp_bind(Port, Socket),
+        tcp_listen(Socket, 5),
+        color(green, Green),
+        color(reset, Reset),
+        format('~wListening on port ~w~w~n', [Green, Port, Reset]),
+        accept_connections(Socket)),
+        _,
+        (color(red, Red),
+        color(reset, Reset),
+        format('~wFailed to start server~w~n', [Red, Reset])).
+
+accept_connections(Socket) :-
+    tcp_accept(Socket, Client, _),
+    tcp_open_socket(Client, In, Out),
+    assertz(connection(Out)),
+    thread_create(handle_client(In, Out), _),
+    accept_connections(Socket).
+
+handle_client(In, Out) :-
+    read_line_to_string(In, Command),
+    (Command == end_of_file -> 
+        close(In),
+        close(Out),
+        retract(connection(Out))
     ;
-        % Plugin matching
+        process_remote(Command),
+        handle_client(In, Out)).
+
+process_remote(Command) :-
+    string_trim(Command, TrimmedCommand),
+    (TrimmedCommand == "exit" -> true
+    ;
         split_string(TrimmedCommand, " ", " ", [PluginName|Args]),
         (plugin(PluginName, _, Handler) ->
             Handler(Args)
         ;
             color(red, Red),
             color(reset, Reset),
-            format('~wUnknown command: ~w~w~n', [Red, PluginName, Reset])
+            format('~wUnknown command~w~n', [Red, Reset])
         )
     ).
 
-% Read user input
+process_command(Command) :-
+    string_trim(Command, TrimmedCommand),
+    (TrimmedCommand == "exit" -> 
+        color(yellow, Yellow),
+        color(reset, Reset),
+        format('~wExiting~w~n', [Yellow, Reset]),
+        halt
+    ;
+        split_string(TrimmedCommand, " ", " ", [PluginName|Args]),
+        (plugin(PluginName, _, Handler) ->
+            Handler(Args)
+        ;
+            color(red, Red),
+            color(reset, Reset),
+            format('~wUnknown command~w~n', [Red, Reset])
+        )
+    ).
+
 read_input(Command) :-
     color(green, Green),
     color(reset, Reset),
     format('~wmukuvi> ~w', [Green, Reset]),
     read_line_to_string(user_input, Command).
 
-% Terminal main loop
 terminal_loop :-
     read_input(Command),
-    (Command == end_of_file -> 
-        true 
+    (Command == end_of_file -> true
     ;
         process_command(Command),
         terminal_loop
     ).
 
-% Display welcome message
 display_welcome :-
     terminal_version(Version),
     color(blue, Blue),
-    color(green, Green),
     color(reset, Reset),
-    format('~w========================================~w~n', [Blue, Reset]),
-    format('  Welcome to Mukuvi Terminal v~w~n', [Version]),
-    format('~w========================================~w~n', [Blue, Reset]),
-    format('Type "help" to see available commands~n').
+    format('~wMukuvi Terminal v~w~w~n', [Blue, Version, Reset]).
 
-% Start terminal
 start_terminal :-
     initialize_plugins,
     display_welcome,
     terminal_loop.
 
-% Main entry point
 :- initialization(start_terminal, main).
