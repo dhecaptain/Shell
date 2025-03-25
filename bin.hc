@@ -120,12 +120,12 @@ U0 PluginProcessList(I64 argc, Str *argv) {
     }
 }
 
-// Resource Monitor Plugin
+
 U0 PluginResourceMonitor(I64 argc, Str *argv) {
     PrintBlue("System Resource Monitor\n");
     PrintBlue("----------------------\n");
 
-    // Memory Usage
+   
     "$FG,2$Memory Usage:$FG$\n";
     "Total: %d KB\n", MemMax;
     "Used: %d KB\n", MemMax - MemAvail;
