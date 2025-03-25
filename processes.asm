@@ -1,150 +1,199 @@
-; Mukuvi Terminal - Process Management Assembly
-; Compile: nasm -f elf64 mukuvi_terminal.asm
-; Link: gcc -no-pie -o mukuvi_terminal mukuvi_terminal.o
-
 section .data
-    ; Process management constants
-    MAX_PROCESSES equ 64
-    PROCESS_NAME_LEN equ 32
-
-    ; Strings and messages
-    prompt db 10, '[MUKUVI] Process Manager > ', 0
-    welcome_msg db 'Mukuvi Process Terminal v1.0', 10, 0
-    help_msg db 'Available Commands:', 10
-             db '  list    : List running processes', 10
-             db '  kill    : Terminate a process', 10
-             db '  spawn   : Create a new process', 10
-             db '  info    : Get process information', 10
-             db '  help    : Show this help', 10
-             db '  exit    : Exit process manager', 10, 0
-    
-    error_generic db 'Error occurred', 10, 0
-    process_format db 'PID: %d, Name: %s, State: %s', 10, 0
-
-section .bss
-    ; Process structure
-    struc Process
-        .pid:        resd 1   ; Process ID
-        .name:       resb PROCESS_NAME_LEN
-        .state:      resb 16  ; Process state
-        .start_time: resq 1   ; Start timestamp
-        .memory:     resd 1   ; Memory usage
-    endstruc
-
-    ; Process management data
-    process_table resb Process_size * MAX_PROCESSES
-    current_process_count resd 1
-
-    ; Input buffer
-    input_buffer resb 256
+    prompt db 'mukuvi(asm)> ', 0
+    welcome db 'Mukuvi Process Monitor v1.0', 0xA
+            db 'Type "list" to show processes', 0xA
+            db 'Type "run" to execute C program', 0xA
+            db 'Type "bash" to run shell command', 0xA
+            db 'Type "exit" to quit', 0xA, 0
+    list_cmd db 'ps -eo pid,comm,args', 0
+    c_compile db 'gcc -o /tmp/mukuvi_prog', 0
+    c_run db '/tmp/mukuvi_prog', 0
+    error_msg db 'Error executing command', 0xA, 0
+    newline db 0xA, 0
+    buffer times 256 db 0
+    proc_list times 4096 db 0
+    child_pid dd 0
 
 section .text
     global _start
 
-; Macro for system calls
-%macro syscall 1-3
-    %if %0 == 1
-        mov rax, %1
-        syscall
-    %elif %0 == 2
-        mov rax, %1
-        mov rdi, %2
-        syscall
-    %else
-        mov rax, %1
-        mov rdi, %2
-        mov rsi, %3
-        syscall
-    %endif
-%endmacro
-
-; Function to print null-terminated string
-print_string:
-    push rdi
-    xor rcx, rcx
-.strlen_loop:
-    cmp byte [rdi + rcx], 0
-    je .strlen_done
-    inc rcx
-    jmp .strlen_loop
-.strlen_done:
-    pop rdi
-    syscall 1, 1, rdi, rcx
-    ret
-
-; List running processes
-list_processes:
-    ; Placeholder implementation
-    mov dword [current_process_count], 0
-    mov rdi, help_msg  ; Simulated process list
-    call print_string
-    ret
-
-; Spawn a new process
-spawn_process:
-    ; Fork syscall implementation
-    syscall 57
-    test rax, rax
-    jz .child_process
-    ; Parent process
-    ret
-.child_process:
-    ; Child process logic
-    syscall 60, 0  ; Exit child process
-
-; Kill a process
-kill_process:
-    ; Get PID from input and send signal
-    ; Placeholder implementation
-    mov rax, 62     ; kill syscall
-    mov rdi, 1      ; Process ID
-    mov rsi, 15     ; SIGTERM
-    syscall
-    ret
-
-; Process information retrieval
-get_process_info:
-    ; Retrieve process details
-    mov rax, 101    ; getpid syscall
-    syscall
-    ; Store PID, retrieve other details
-    ret
-
-; Input handling
-read_input:
-    ; Clear input buffer
-    mov byte [input_buffer], 0
-    ; Read input
-    syscall 0, 0, input_buffer, 256
-    ret
-
-; Command parsing
-parse_command:
-    ; Basic command parsing
-    mov rsi, input_buffer
-    ; Compare and jump to appropriate handler
-    ret
-
-; Main terminal loop
 _start:
-    ; Print welcome message
-    mov rdi, welcome_msg
+    mov eax, welcome
     call print_string
 
-.terminal_loop:
-    ; Print prompt
-    mov rdi, prompt
+main_loop:
+    mov eax, prompt
     call print_string
 
-    ; Read input
-    call read_input
+    mov eax, buffer
+    mov ebx, 256
+    call read_string
 
-    ; Parse and execute command
-    call parse_command
+    mov esi, buffer
+    cmp byte [esi], 'e'
+    je check_exit
+    cmp byte [esi], 'l'
+    je handle_list
+    cmp byte [esi], 'r'
+    je handle_run
+    cmp byte [esi], 'b'
+    je handle_bash
+    jmp main_loop
 
-    ; Continue loop
-    jmp .terminal_loop
+check_exit:
+    mov eax, buffer
+    mov ebx, exit_cmd
+    call compare_strings
+    je exit_program
+    jmp main_loop
 
-; Exit terminal
-exit_terminal:
-    syscall 60, 0
+handle_list:
+    mov eax, buffer
+    mov ebx, list_cmd_str
+    call compare_strings
+    je list_processes
+    jmp main_loop
+
+handle_run:
+    mov eax, buffer
+    mov ebx, run_cmd_str
+    call compare_strings
+    je run_c_program
+    jmp main_loop
+
+handle_bash:
+    mov eax, buffer
+    mov ebx, bash_cmd_str
+    call compare_strings
+    je run_bash_command
+    jmp main_loop
+
+list_processes:
+    mov eax, list_cmd
+    call execute_system
+    jmp main_loop
+
+run_c_program:
+    mov eax, c_compile
+    call execute_system
+    cmp eax, 0
+    jl compile_error
+    mov eax, c_run
+    call execute_system
+    jmp main_loop
+
+compile_error:
+    mov eax, compile_err_msg
+    call print_string
+    jmp main_loop
+
+run_bash_command:
+    mov esi, buffer
+    add esi, 5
+    mov eax, esi
+    call execute_system
+    jmp main_loop
+
+execute_system:
+    push eax
+    mov eax, 2
+    xor ebx, ebx
+    xor ecx, ecx
+    int 0x80
+    cmp eax, 0
+    jl system_error
+    mov [child_pid], eax
+    mov eax, 7
+    mov ebx, [child_pid]
+    xor ecx, ecx
+    xor edx, edx
+    int 0x80
+    mov eax, 0
+    ret
+
+system_error:
+    mov eax, error_msg
+    call print_string
+    mov eax, -1
+    ret
+
+print_string:
+    push eax
+    push ebx
+    push ecx
+    push edx
+    mov ecx, eax
+    call strlen
+    mov edx, eax
+    mov eax, 4
+    mov ebx, 1
+    int 0x80
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+    ret
+
+read_string:
+    push eax
+    push ebx
+    push ecx
+    push edx
+    mov ecx, eax
+    mov edx, ebx
+    mov eax, 3
+    mov ebx, 0
+    int 0x80
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+    ret
+
+strlen:
+    push ebx
+    mov ebx, eax
+.nextchar:
+    cmp byte [eax], 0
+    jz .finished
+    inc eax
+    jmp .nextchar
+.finished:
+    sub eax, ebx
+    pop ebx
+    ret
+
+compare_strings:
+    push eax
+    push ebx
+.compare_loop:
+    mov al, [esi]
+    mov bl, [edi]
+    cmp al, bl
+    jne .not_equal
+    test al, al
+    jz .equal
+    inc esi
+    inc edi
+    jmp .compare_loop
+.not_equal:
+    clc
+    jmp .done
+.equal:
+    stc
+.done:
+    pop ebx
+    pop eax
+    ret
+
+exit_program:
+    mov eax, 1
+    xor ebx, ebx
+    int 0x80
+
+section .bss
+    exit_cmd db 'exit', 0
+    list_cmd_str db 'list', 0
+    run_cmd_str db 'run', 0
+    bash_cmd_str db 'bash', 0
+    compile_err_msg db 'Compilation failed', 0xA, 0
