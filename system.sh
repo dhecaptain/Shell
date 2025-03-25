@@ -6,7 +6,6 @@ CONFIG_DIR="/etc/mukuvi"
 CONFIG_FILE="${CONFIG_DIR}/mukuvi.conf"
 SOCKET_FILE="/tmp/mukuvi_socket"
 PROCESS_LOG="/tmp/mukuvi_processes.log"
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
