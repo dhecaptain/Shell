@@ -31,7 +31,6 @@ class MukuviTerminal {
     I64 plugin_count;
 };
 
-// Global Terminal Instance
 MukuviTerminal *gTerminal;
 
 // Plugin Function Prototypes
@@ -41,18 +40,17 @@ U0 PluginProcessList(I64 argc, Str *argv);
 U0 PluginResourceMonitor(I64 argc, Str *argv);
 U0 PluginFileExplorer(I64 argc, Str *argv);
 
-// Initialize Terminal
 U0 InitializeTerminal(MukuviTerminal *terminal) {
     terminal->prompt = "mukuvi> ";
     terminal->debug_mode = 0;
     terminal->plugin_count = 0;
 
-    // Allocate Plugins
+    
     for (I64 i = 0; i < MAX_PLUGINS; i++) {
         terminal->plugins[i] = CAlloc(sizeof(MukuviPlugin));
     }
 
-    // Register Plugins
+  
     {
         terminal->plugins[terminal->plugin_count]->name = "help";
         terminal->plugins[terminal->plugin_count]->function = &PluginHelp;
@@ -81,7 +79,7 @@ U0 InitializeTerminal(MukuviTerminal *terminal) {
     }
 }
 
-// Help Plugin: Display Available Commands
+
 U0 PluginHelp(I64 argc, Str *argv) {
     PrintBlue("Mukuvi Terminal - Available Plugins\n");
     PrintBlue("-----------------------------\n");
@@ -92,23 +90,23 @@ U0 PluginHelp(I64 argc, Str *argv) {
     }
 }
 
-// System Information Plugin
+
 U0 PluginSystemInfo(I64 argc, Str *argv) {
     PrintBlue("System Information\n");
     PrintBlue("------------------\n");
 
-    // Memory Information
+   
     "$FG,2$Memory Information:$FG$\n";
     "Total Memory: %d KB\n", MemMax;
     "Free Memory: %d KB\n", MemAvail;
 
-    // CPU Information
+   
     "$FG,2$CPU Information:$FG$\n";
     "Processor: TempleOS HolyC Kernel\n";
     "Clock Speed: %d MHz\n", GetCPUHz;
 }
 
-// Process List Plugin
+
 U0 PluginProcessList(I64 argc, Str *argv) {
     PrintBlue("Running Processes\n");
     PrintBlue("----------------\n");
