@@ -1,188 +1,112 @@
 #!/bin/bash
 
-# Mukuvi System Terminal - Advanced System Interaction
-
-# Logging configuration
 LOG_DIR="/var/log/mukuvi"
 LOG_FILE="${LOG_DIR}/mukuvi_terminal.log"
+CONFIG_DIR="/etc/mukuvi"
+CONFIG_FILE="${CONFIG_DIR}/mukuvi.conf"
+SOCKET_FILE="/tmp/mukuvi_socket"
+PROCESS_LOG="/tmp/mukuvi_processes.log"
 
-# Color configuration
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
-# System configuration
-MUKUVI_VERSION="1.0.0"
+MUKUVI_VERSION="2.0.0"
 SYSTEM_REPORT_FILE="/tmp/mukuvi_system_report.txt"
 
-# Logging function
+init_system() {
+    mkdir -p "$LOG_DIR"
+    mkdir -p "$CONFIG_DIR"
+    touch "$LOG_FILE"
+    touch "$CONFIG_FILE"
+    chmod 600 "$CONFIG_FILE"
+}
+
 log_message() {
     local level="$1"
     local message="$2"
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    
-    # Ensure log directory exists
-    mkdir -p "$LOG_DIR"
-    
-    # Write to log file
     echo "[${timestamp}] [${level}] ${message}" >> "$LOG_FILE"
 }
 
-# System health check
-perform_system_health_check() {
-    local report_file="$1"
-    
-    # Comprehensive system report
-    {
-        echo "MUKUVI SYSTEM HEALTH REPORT"
-        echo "=========================="
-        echo "Timestamp: $(date)"
-        
-        # CPU Information
-        echo -e "\nCPU Information:"
-        lscpu | grep -E 'Model name|Socket|Thread|Core|CPU MHz'
-        
-        # Memory Information
-        echo -e "\nMemory Information:"
-        free -h
-        
-        # Disk Usage
-        echo -e "\nDisk Usage:"
-        df -h
-        
-        # Network Interfaces
-        echo -e "\nNetwork Interfaces:"
-        ip addr show
-        
-        # Running Processes
-        echo -e "\nTop 10 Processes by Memory:"
-        ps aux | sort -nrk 4 | head -10
-    } > "$report_file"
-    
-    log_message "INFO" "System health check completed"
+load_config() {
+    [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
 }
 
-# System monitoring function
-monitor_system() {
-    local interval="${1:-5}"
-    
-    echo "Starting System Monitoring (Interval: ${interval} seconds)"
-    log_message "INFO" "System monitoring started"
-    
+save_config() {
+    declare -p MUKUVI_PROCESS_MONITOR MUKUVI_NETWORK_MONITOR > "$CONFIG_FILE"
+}
+
+connect_to_c_terminal() {
+    if [ -S "$SOCKET_FILE" ]; then
+        echo -e "${GREEN}Connecting to C terminal...${NC}"
+        nc -U "$SOCKET_FILE"
+    else
+        echo -e "${RED}C terminal socket not found${NC}"
+    fi
+}
+
+monitor_processes() {
+    echo -e "${PURPLE}Starting process monitoring...${NC}"
     while true; do
         clear
-        echo "Mukuvi System Monitor"
-        echo "---------------------"
+        echo -e "${CYAN}Mukuvi Process Monitor${NC}"
+        echo "1. View all processes"
+        echo "2. View C program processes"
+        echo "3. View bash processes"
+        echo "4. Return to main menu"
         
-        # CPU Usage
-        echo -e "${GREEN}CPU Usage:${NC}"
-        top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
-        
-        # Memory Usage
-        echo -e "\n${BLUE}Memory Usage:${NC}"
-        free -h
-        
-        # Disk I/O
-        echo -e "\n${YELLOW}Disk I/O:${NC}"
-        iostat -x 1 1
-        
-        sleep "$interval"
-    done
-}
-
-# System performance benchmark
-benchmark_system() {
-    echo "Running Mukuvi System Benchmark"
-    log_message "INFO" "System benchmark initiated"
-    
-    # CPU Benchmark
-    echo "CPU Benchmark:"
-    time dd if=/dev/zero of=/dev/null bs=1M count=1024
-    
-    # Disk I/O Benchmark
-    echo -e "\nDisk I/O Benchmark:"
-    dd if=/dev/zero of=/tmp/benchmark bs=1M count=1024 conv=fdatasync
-    
-    # Network Benchmark
-    echo -e "\nNetwork Benchmark:"
-    ping -c 5 google.com
-}
-
-# Interactive system configuration
-system_configuration() {
-    local config_file="/etc/mukuvi/config"
-    
-    echo "Mukuvi System Configuration"
-    echo "=========================="
-    
-    # Prompt for configuration
-    read -p "Enter hostname: " new_hostname
-    read -p "Enter timezone: " new_timezone
-    
-    # Apply configurations
-    sudo hostnamectl set-hostname "$new_hostname"
-    sudo timedatectl set-timezone "$new_timezone"
-    
-    # Save configuration
-    {
-        echo "HOSTNAME=${new_hostname}"
-        echo "TIMEZONE=${new_timezone}"
-    } | sudo tee "$config_file"
-    
-    log_message "CONFIG" "System configuration updated"
-}
-
-# Main terminal function
-mukuvi_terminal() {
-    local running=true
-    
-    while $running; do
-        # Clear screen and display prompt
-        clear
-        echo -e "${BLUE}Mukuvi System Terminal v${MUKUVI_VERSION}${NC}"
-        echo "Available Commands:"
-        echo "  1. System Health Check"
-        echo "  2. System Monitor"
-        echo "  3. System Benchmark"
-        echo "  4. System Configuration"
-        echo "  5. Exit"
-        
-        # User input
-        read -p "${GREEN}Enter your choice (1-5): ${NC}" choice
-        
-        # Command processing
-        case "$choice" in
-            1)
-                perform_system_health_check "$SYSTEM_REPORT_FILE"
-                cat "$SYSTEM_REPORT_FILE"
-                read -p "Press Enter to continue..."
-                ;;
-            2)
-                monitor_system
-                ;;
-            3)
-                benchmark_system
-                read -p "Press Enter to continue..."
-                ;;
-            4)
-                system_configuration
-                ;;
-            5)
-                running=false
-                log_message "INFO" "Mukuvi Terminal exited"
-                ;;
-            *)
-                echo "Invalid choice. Try again."
-                sleep 2
-                ;;
+        read -p "Select option: " choice
+        case $choice in
+            1) ps aux --sort=-%mem | head -20 ;;
+            2) pgrep -a gcc ;;
+            3) pgrep -a bash ;;
+            4) break ;;
+            *) echo "Invalid option" ;;
         esac
+        sleep 2
     done
 }
 
-# Trap signals
-trap 'log_message "WARN" "Terminal interrupted"' SIGINT SIGTERM
+analyze_system() {
+    echo -e "${YELLOW}Running system analysis...${NC}"
+    sys_report="/tmp/mukuvi_system_analysis_$(date +%s).log"
+    
+    echo "=== CPU Analysis ===" > "$sys_report"
+    lscpu >> "$sys_report"
+    echo "" >> "$sys_report"
+    
+    echo "=== Memory Analysis ===" >> "$sys_report"
+    free -h >> "$sys_report"
+    echo "" >> "$sys_report"
+    
+    echo "=== Disk Analysis ===" >> "$sys_report"
+    df -h >> "$sys_report"
+    echo "" >> "$sys_report"
+    
+    echo "=== Network Analysis ===" >> "$sys_report"
+    ip addr >> "$sys_report"
+    echo "" >> "$sys_report"
+    
+    echo "=== Process Analysis ===" >> "$sys_report"
+    ps aux --sort=-%mem | head -20 >> "$sys_report"
+    
+    less "$sys_report"
+}
 
-# Start terminal
-mukuvi_terminal
+integrate_julia() {
+    echo -e "${BLUE}Initializing Julia integration...${NC}"
+    if command -v julia &>/dev/null; then
+        julia -e 'using MukuviErrorCapture; MukuviErrorCapture.run_terminal()'
+    else
+        echo -e "${RED}Julia not found in PATH${NC}"
+    fi
+}
+
+show_logs() {
+    echo -e "${CYAN}Displaying system logs...${NC}"
+    [ -f "$
