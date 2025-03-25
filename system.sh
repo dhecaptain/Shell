@@ -8,7 +8,7 @@ NC='\033[0m'
 display_welcome() {
     clear
     echo -e "${BLUE}===========================================${NC}"
-    echo -e "${GREEN}Welcome to Basic Bash Shell Terminal${NC}"
+    echo -e "${GREEN}Welcome to Mukuvi Bash Shell Terminal${NC}"
     echo -e "${BLUE}===========================================${NC}"
     echo -e "Type 'help' for a list of available commands"
     echo -e "Type 'exit' to quit the shell"
@@ -35,7 +35,7 @@ main_shell() {
         echo -en "${RED}bash-shell>${NC} "
         read -r command
 
-        # Command processing
+
         case "$command" in
             "pwd")
                 pwd
@@ -69,6 +69,5 @@ main_shell() {
     done
 }
 
-# Start the shell
 display_welcome
 main_shell

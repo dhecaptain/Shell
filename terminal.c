@@ -17,7 +17,6 @@
     #define GET_USER getpwuid(getuid())->pw_name
 #endif
 
-// ANSI Color Codes
 #define RED     "\x1b[31m"
 #define GREEN   "\x1b[32m"
 #define YELLOW  "\x1b[33m"
@@ -26,12 +25,10 @@
 
 #define MAX_COMMAND_LENGTH 100
 
-// Function prototypes
 void display_welcome();
 void show_help();
 void execute_command(char* command);
 
-// Main shell function
 void main_shell() {
     char command[MAX_COMMAND_LENGTH];
 
@@ -40,7 +37,7 @@ void main_shell() {
         if (fgets(command, sizeof(command), stdin) == NULL) {
             break;
         }
-        command[strcspn(command, "\n")] = 0;  // Remove newline
+        command[strcspn(command, "\n")] = 0; 
 
         if (strcmp(command, "exit") == 0) {
             printf(YELLOW "Exiting shell. Goodbye!\n" RESET);
@@ -50,17 +47,16 @@ void main_shell() {
     }
 }
 
-// Display welcome message
+
 void display_welcome() {
     system(CLEAR_SCREEN);
     printf(BLUE "===========================================\n" RESET);
-    printf(GREEN "Welcome to Basic C Shell Terminal\n" RESET);
+    printf(GREEN "Welcome to Mukuvi Shell Terminal\n" RESET);
     printf(BLUE "===========================================\n" RESET);
     printf("Type 'help' for available commands\n");
     printf("Type 'exit' to quit\n");
 }
 
-// Show help menu
 void show_help() {
     printf(YELLOW "\nAvailable Commands:\n" RESET);
     printf("  - pwd\t\t: Show current directory\n");
@@ -72,7 +68,6 @@ void show_help() {
     printf("  - exit\t: Exit the shell\n");
 }
 
-// Execute user command
 void execute_command(char* command) {
     if (strcmp(command, "pwd") == 0) {
         char cwd[1024];
@@ -109,7 +104,6 @@ void execute_command(char* command) {
     }
 }
 
-// Main function
 int main() {
     display_welcome();
     main_shell();
