@@ -1,10 +1,9 @@
-// Mukuvi Terminal in HolyC (TempleOS Style)
+
 
 #define MAX_COMMAND_LENGTH 256
 #define MAX_ARGS 64
 #define MAX_PLUGINS 16
 
-// Color Definitions
 U0 PrintRed(Str msg) {
     "$FG,4$%s$FG$", msg;
 }
@@ -17,14 +16,14 @@ U0 PrintBlue(Str msg) {
     "$FG,1$%s$FG$", msg;
 }
 
-// Plugin Structure
+
 class MukuviPlugin {
     Str name;
     U0 (*function)(I64 argc, Str *argv);
     Str description;
 };
 
-// Terminal Configuration
+
 class MukuviTerminal {
     Str prompt;
     I64 debug_mode;
