@@ -1,23 +1,47 @@
+; Mukuvi Terminal - Process Management Assembly
+; Compile: nasm -f elf64 mukuvi_terminal.asm
+; Link: gcc -no-pie -o mukuvi_terminal mukuvi_terminal.o
+
 section .data
-    prompt db 10, 27, '[31mbash-shell> ', 27, '[0m', 0
-    welcome_msg db 27, '[34m==========================================', 27, '[0m', 10
-               db 27, '[32mWelcome to Mukuvi Shell Terminal', 27, '[0m', 10
-               db 27, '[34m==========================================', 27, '[0m', 10
-               db 'Type "help" for commands, "exit" to quit', 10, 0
-    help_msg db 10, 'Available Commands:', 10
-             db '  - help   : Show this help menu', 10
-             db '  - exit   : Exit the shell', 10
-             db '  - hello  : Display a greeting', 10, 0
-    hello_msg db 'Hello from Assembly Shell!', 10, 0
-    error_msg db 'Command not recognized', 10, 0
-    exit_msg db 'Goodbye!', 10, 0
+    ; Process management constants
+    MAX_PROCESSES equ 64
+    PROCESS_NAME_LEN equ 32
+
+    ; Strings and messages
+    prompt db 10, '[MUKUVI] Process Manager > ', 0
+    welcome_msg db 'Mukuvi Process Terminal v1.0', 10, 0
+    help_msg db 'Available Commands:', 10
+             db '  list    : List running processes', 10
+             db '  kill    : Terminate a process', 10
+             db '  spawn   : Create a new process', 10
+             db '  info    : Get process information', 10
+             db '  help    : Show this help', 10
+             db '  exit    : Exit process manager', 10, 0
+    
+    error_generic db 'Error occurred', 10, 0
+    process_format db 'PID: %d, Name: %s, State: %s', 10, 0
 
 section .bss
-    input resb 256
+    ; Process structure
+    struc Process
+        .pid:        resd 1   ; Process ID
+        .name:       resb PROCESS_NAME_LEN
+        .state:      resb 16  ; Process state
+        .start_time: resq 1   ; Start timestamp
+        .memory:     resd 1   ; Memory usage
+    endstruc
+
+    ; Process management data
+    process_table resb Process_size * MAX_PROCESSES
+    current_process_count resd 1
+
+    ; Input buffer
+    input_buffer resb 256
 
 section .text
     global _start
 
+; Macro for system calls
 %macro syscall 1-3
     %if %0 == 1
         mov rax, %1
@@ -34,6 +58,7 @@ section .text
     %endif
 %endmacro
 
+; Function to print null-terminated string
 print_string:
     push rdi
     xor rcx, rcx
@@ -47,99 +72,79 @@ print_string:
     syscall 1, 1, rdi, rcx
     ret
 
+; List running processes
+list_processes:
+    ; Placeholder implementation
+    mov dword [current_process_count], 0
+    mov rdi, help_msg  ; Simulated process list
+    call print_string
+    ret
+
+; Spawn a new process
+spawn_process:
+    ; Fork syscall implementation
+    syscall 57
+    test rax, rax
+    jz .child_process
+    ; Parent process
+    ret
+.child_process:
+    ; Child process logic
+    syscall 60, 0  ; Exit child process
+
+; Kill a process
+kill_process:
+    ; Get PID from input and send signal
+    ; Placeholder implementation
+    mov rax, 62     ; kill syscall
+    mov rdi, 1      ; Process ID
+    mov rsi, 15     ; SIGTERM
+    syscall
+    ret
+
+; Process information retrieval
+get_process_info:
+    ; Retrieve process details
+    mov rax, 101    ; getpid syscall
+    syscall
+    ; Store PID, retrieve other details
+    ret
+
+; Input handling
 read_input:
-    mov byte [input], 0
-    syscall 0, 0, input, 256
-    mov rdi, input
-    call remove_newline
+    ; Clear input buffer
+    mov byte [input_buffer], 0
+    ; Read input
+    syscall 0, 0, input_buffer, 256
     ret
 
-remove_newline:
-    xor rcx, rcx
-.loop:
-    cmp byte [rdi + rcx], 10
-    je .replace
-    cmp byte [rdi + rcx], 0
-    je .done
-    inc rcx
-    jmp .loop
-.replace:
-    mov byte [rdi + rcx], 0
-.done:
+; Command parsing
+parse_command:
+    ; Basic command parsing
+    mov rsi, input_buffer
+    ; Compare and jump to appropriate handler
     ret
 
-compare_command:
-    push rsi
-    push rdi
-.compare_loop:
-    mov al, [rsi]
-    mov bl, [rdi]
-    cmp al, 0
-    je .check_end
-    cmp bl, 0
-    je .check_end
-    cmp al, bl
-    jne .not_equal
-    inc rsi
-    inc rdi
-    jmp .compare_loop
-.check_end:
-    cmp al, 0
-    jne .not_equal
-    cmp bl, 0
-    jne .not_equal
-    pop rdi
-    pop rsi
-    mov rax, 1
-    ret
-.not_equal:
-    pop rdi
-    pop rsi
-    xor rax, rax
-    ret
-
+; Main terminal loop
 _start:
+    ; Print welcome message
     mov rdi, welcome_msg
     call print_string
 
-.shell_loop:
+.terminal_loop:
+    ; Print prompt
     mov rdi, prompt
     call print_string
+
+    ; Read input
     call read_input
-    mov rsi, input
-    mov rdi, exit_cmd
-    call compare_command
-    cmp rax, 1
-    je .exit_shell
-    mov rsi, input
-    mov rdi, help_cmd
-    call compare_command
-    cmp rax, 1
-    je .show_help
-    mov rsi, input
-    mov rdi, hello_cmd
-    call compare_command
-    cmp rax, 1
-    je .show_hello
-    mov rdi, error_msg
-    call print_string
-    jmp .shell_loop
 
-.show_help:
-    mov rdi, help_msg
-    call print_string
-    jmp .shell_loop
+    ; Parse and execute command
+    call parse_command
 
-.show_hello:
-    mov rdi, hello_msg
-    call print_string
-    jmp .shell_loop
+    ; Continue loop
+    jmp .terminal_loop
 
-.exit_shell:
-    mov rdi, exit_msg
-    call print_string
+; Exit terminal
+exit_terminal:
     syscall 60, 0
-
-exit_cmd db 'exit', 0
-help_cmd db 'help', 0
-hello_cmd db 'hello', 0

@@ -1,38 +1,227 @@
-U0 PrintString(Str s) {
-    Print(s);
+// Mukuvi Terminal in HolyC (TempleOS Style)
+
+#define MAX_COMMAND_LENGTH 256
+#define MAX_ARGS 64
+#define MAX_PLUGINS 16
+
+// Color Definitions
+U0 PrintRed(Str msg) {
+    "$FG,4$%s$FG$", msg;
 }
 
-Str ReadInput() {
-    Str input;
-    Print("> ");
-    input = GetStr();
-    return input;
+U0 PrintGreen(Str msg) {
+    "$FG,2$%s$FG$", msg;
 }
 
-U0 ShellLoop() {
-    Str welcome_msg = "Welcome to Mukuvi Shell Terminal\nType 'help' for commands, 'exit' to quit\n";
-    Str help_msg = "\nAvailable Commands:\n  - help   : Show this help menu\n  - exit   : Exit the shell\n  - hello  : Display a greeting\n";
-    Str hello_msg = "Hello from HolyC Shell!\n";
-    Str error_msg = "Command not recognized\n";
-    Str exit_msg = "Goodbye!\n";
-    Str input;
+U0 PrintBlue(Str msg) {
+    "$FG,1$%s$FG$", msg;
+}
 
-    PrintString(welcome_msg);
-    
-    while (1) {
-        input = ReadInput();
+// Plugin Structure
+class MukuviPlugin {
+    Str name;
+    U0 (*function)(I64 argc, Str *argv);
+    Str description;
+};
 
-        if (StrCmp(input, "exit") == 0) {
-            PrintString(exit_msg);
-            Break;
-        } else if (StrCmp(input, "help") == 0) {
-            PrintString(help_msg);
-        } else if (StrCmp(input, "hello") == 0) {
-            PrintString(hello_msg);
-        } else {
-            PrintString(error_msg);
-        }
+// Terminal Configuration
+class MukuviTerminal {
+    Str prompt;
+    I64 debug_mode;
+    MukuviPlugin *plugins[MAX_PLUGINS];
+    I64 plugin_count;
+};
+
+// Global Terminal Instance
+MukuviTerminal *gTerminal;
+
+// Plugin Function Prototypes
+U0 PluginHelp(I64 argc, Str *argv);
+U0 PluginSystemInfo(I64 argc, Str *argv);
+U0 PluginProcessList(I64 argc, Str *argv);
+U0 PluginResourceMonitor(I64 argc, Str *argv);
+U0 PluginFileExplorer(I64 argc, Str *argv);
+
+// Initialize Terminal
+U0 InitializeTerminal(MukuviTerminal *terminal) {
+    terminal->prompt = "mukuvi> ";
+    terminal->debug_mode = 0;
+    terminal->plugin_count = 0;
+
+    // Allocate Plugins
+    for (I64 i = 0; i < MAX_PLUGINS; i++) {
+        terminal->plugins[i] = CAlloc(sizeof(MukuviPlugin));
+    }
+
+    // Register Plugins
+    {
+        terminal->plugins[terminal->plugin_count]->name = "help";
+        terminal->plugins[terminal->plugin_count]->function = &PluginHelp;
+        terminal->plugins[terminal->plugin_count]->description = "Display available commands";
+        terminal->plugin_count++;
+
+        terminal->plugins[terminal->plugin_count]->name = "sysinfo";
+        terminal->plugins[terminal->plugin_count]->function = &PluginSystemInfo;
+        terminal->plugins[terminal->plugin_count]->description = "Display system information";
+        terminal->plugin_count++;
+
+        terminal->plugins[terminal->plugin_count]->name = "ps";
+        terminal->plugins[terminal->plugin_count]->function = &PluginProcessList;
+        terminal->plugins[terminal->plugin_count]->description = "List running processes";
+        terminal->plugin_count++;
+
+        terminal->plugins[terminal->plugin_count]->name = "resources";
+        terminal->plugins[terminal->plugin_count]->function = &PluginResourceMonitor;
+        terminal->plugins[terminal->plugin_count]->description = "Monitor system resources";
+        terminal->plugin_count++;
+
+        terminal->plugins[terminal->plugin_count]->name = "files";
+        terminal->plugins[terminal->plugin_count]->function = &PluginFileExplorer;
+        terminal->plugins[terminal->plugin_count]->description = "Explore file system";
+        terminal->plugin_count++;
     }
 }
 
-ShellLoop();
+// Help Plugin: Display Available Commands
+U0 PluginHelp(I64 argc, Str *argv) {
+    PrintBlue("Mukuvi Terminal - Available Plugins\n");
+    PrintBlue("-----------------------------\n");
+
+    for (I64 i = 0; i < gTerminal->plugin_count; i++) {
+        PrintGreen(gTerminal->plugins[i]->name);
+        "$FG$: %s\n", gTerminal->plugins[i]->description;
+    }
+}
+
+// System Information Plugin
+U0 PluginSystemInfo(I64 argc, Str *argv) {
+    PrintBlue("System Information\n");
+    PrintBlue("------------------\n");
+
+    // Memory Information
+    "$FG,2$Memory Information:$FG$\n";
+    "Total Memory: %d KB\n", MemMax;
+    "Free Memory: %d KB\n", MemAvail;
+
+    // CPU Information
+    "$FG,2$CPU Information:$FG$\n";
+    "Processor: TempleOS HolyC Kernel\n";
+    "Clock Speed: %d MHz\n", GetCPUHz;
+}
+
+// Process List Plugin
+U0 PluginProcessList(I64 argc, Str *argv) {
+    PrintBlue("Running Processes\n");
+    PrintBlue("----------------\n");
+
+    // In TempleOS, processes are unique
+    "Total Processes: %d\n", TaskGetNum;
+    
+    // List some task details
+    for (CTask *task = sys_task_list; task; task = task->next) {
+        "%s (PID: %d)\n", task->task_name, task->task_num;
+    }
+}
+
+// Resource Monitor Plugin
+U0 PluginResourceMonitor(I64 argc, Str *argv) {
+    PrintBlue("System Resource Monitor\n");
+    PrintBlue("----------------------\n");
+
+    // Memory Usage
+    "$FG,2$Memory Usage:$FG$\n";
+    "Total: %d KB\n", MemMax;
+    "Used: %d KB\n", MemMax - MemAvail;
+    "Free: %d KB\n", MemAvail;
+
+    // CPU Load (Simplified)
+    "$FG,2$CPU Load:$FG$\n";
+    "Current Load: Approximately %d%%\n", 
+        (GetCPULoad * 100) / GetCPUHz;
+}
+
+// File Explorer Plugin
+U0 PluginFileExplorer(I64 argc, Str *argv) {
+    PrintBlue("File System Explorer\n");
+    PrintBlue("-------------------\n");
+
+    // List root directory contents
+    CDirEntry *entry = FilesFind("/");
+    while (entry) {
+        "%s\n", entry->name;
+        entry = entry->next;
+    }
+}
+
+// Command Handler
+U0 HandleCommand(MukuviTerminal *terminal, Str input) {
+    Str argv[MAX_ARGS];
+    I64 argc = 0;
+
+    // Basic tokenization
+    Str token = StrFirstOcc(input, " ");
+    while (token && argc < MAX_ARGS - 1) {
+        argv[argc++] = token;
+        token = StrFirstOcc(token + 1, " ");
+    }
+    argv[argc] = NULL;
+
+    // Exit command
+    if (StrCmp(argv[0], "exit") == 0) {
+        PrintGreen("Exiting Mukuvi Terminal\n");
+        Exit;
+    }
+
+    // Plugin matching
+    for (I64 i = 0; i < terminal->plugin_count; i++) {
+        if (StrCmp(argv[0], terminal->plugins[i]->name) == 0) {
+            terminal->plugins[i]->function(argc, argv);
+            return;
+        }
+    }
+
+    // Unknown command
+    PrintRed("Unknown command: %s\n", argv[0]);
+}
+
+// Welcome Message
+U0 DisplayWelcome() {
+    PrintBlue("========================================\n");
+    PrintBlue("  Welcome to Mukuvi Terminal v1.0.0    \n");
+    PrintBlue("========================================\n");
+    "Type 'help' for available commands\n";
+}
+
+// Main Terminal Function
+U0 MukuviTerminalMain() {
+    // Allocate Terminal
+    gTerminal = CAlloc(sizeof(MukuviTerminal));
+    InitializeTerminal(gTerminal);
+
+    // Display Welcome
+    DisplayWelcome();
+
+    // Input Buffer
+    Str input[MAX_COMMAND_LENGTH];
+
+    // Terminal Loop
+    while (TRUE) {
+        // Display Prompt
+        "%s", gTerminal->prompt;
+
+        // Read Input
+        GetS(input, MAX_COMMAND_LENGTH);
+
+        // Skip Empty Input
+        if (StrLen(input) == 0)
+            continue;
+
+        // Handle Command
+        HandleCommand(gTerminal, input);
+    }
+}
+
+// Program Entry Point
+U0 Main() {
+    MukuviTerminalMain;
+}
