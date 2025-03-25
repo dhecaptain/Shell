@@ -4,8 +4,51 @@
         {
             "type": "bashdb",
             "request": "launch",
-            "name": "Bash-Debug",
-            "program": "${workspaceFolder}/shell_terminal.sh"
+            "name": "Mukuvi-Bash-Debug",
+            "program": "${workspaceFolder}/bash/mukuvi.sh",
+            "args": ["--debug", "--log-level=verbose"],
+            "env": {
+                "MUKUVI_DEBUG": "1",
+                "TERM": "xterm-256color"
+            },
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": true,
+            "trace": true,
+            "showDebugOutput": true,
+            "terminalKind": "integrated",
+            "sourceMaps": true,
+            "sourceMapPathOverrides": {
+                "/mnt/*": "${workspaceFolder}/*"
+            },
+            "preLaunchTask": "build-bash-components",
+            "postDebugTask": "cleanup-debug"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Mukuvi-C-Debug",
+            "program": "${workspaceFolder}/c/build/mukuvi",
+            "args": ["--color", "--interactive"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/c",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build-c-terminal"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Mukuvi-Full-Debug",
+            "configurations": ["Mukuvi-Bash-Debug", "Mukuvi-C-Debug"],
+            "stopAll": true
         }
     ]
 }
